@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Painel PCA · 2026 · Delta Tinturaria</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#111827;padding:0 16px 40px}
+:root{
+  --bg2:#f5f5f7;--bgI:#e6f1fb;--txt1:#111827;--txt2:#6b7280;--txt3:#9ca3af;
+  --bdr1:#e5e7eb;--bdr2:#d1d5db;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg2:#1e293b;--bgI:#1e3a5f;--txt1:#f1f5f9;--txt2:#94a3b8;--txt3:#64748b;
+  --bdr1:#334155;--bdr2:#475569;
+  body{background:#0f172a}
+}}
+@keyframes spin{to{transform:rotate(360deg)}}
+button{font-family:inherit}
+</style>
+</head>
+<body>
+<div id="root" style="max-width:860px;margin:0 auto;padding-top:1.2rem"></div>
+<script>
+const{useState,createElement:h}=React;
+
+// ─── Dados reais lidos da planilha PCA.2026.xlsx em 16/06/2026 às 17:02 ──────
+// JUNHO/2026: 187 OS · 663 pçs · 218,31 kg · 12 dias úteis · pçs/dia: 55,25
+// Peso médio: 0,329 kg ✅ ACIMA da meta · Máq 4 em EXCESSO (108,8%)
+// ⚠ LAVADORA 3 EM MANUTENÇÃO (desde 26/05 — 21 dias, sem previsão)
+// Programação: 19 OS · 57 pçs (17 e 18/06) · Total 2026: 9.935 pçs
+const BASE = {
+  mesAtual: {
+    nome:"Junho/2026",
+    diasUteis:12, diasRestantes:9,
+    os:187, pecas:663, kg:218.31,
+    pcsDia:55.25, kgDia:18.19, osDia:15.58, pesoMedio:0.329,
+  },
+  diasDoMes: [
+    { data:"01/06", ds:"Seg", os:11, pecas: 55, kg:15.4 },
+    { data:"02/06", ds:"Ter", os:12, pecas: 62, kg:17.8 },
+    { data:"03/06", ds:"Qua", os:11, pecas: 56, kg:16.1 },
+    { data:"04/06", ds:"Qui", os:10, pecas: 30, kg: 8.6 },
+    { data:"05/06", ds:"Sex", os: 9, pecas: 25, kg: 7.2 },
+    { data:"08/06", ds:"Seg", os:13, pecas: 28, kg: 8.0 },
+    { data:"09/06", ds:"Ter", os:18, pecas: 62, kg:18.2 },
+    { data:"10/06", ds:"Qua", os:16, pecas: 45, kg:13.6 },
+    { data:"11/06", ds:"Qui", os:22, pecas: 82, kg:28.5 },
+    { data:"12/06", ds:"Sex", os:26, pecas: 44, kg:16.0 },
+    { data:"15/06", ds:"Seg", os:20, pecas: 90, kg:33.5 },
+    { data:"16/06", ds:"Ter", os:19, pecas: 84, kg:35.4, parcial:true },
+  ],
+  mediaHistoricaDia: 65.0,
+  mediaAnual2026: { pcsDia:85.6, kgDia:26.0, osDia:17.7, pecasMes:1854 },
+  historico: {
+    "2023":{ os:353, pecas:1074, kg:332.31, pcsDia:48.8, kgDia:15.1 },
+    "2024":{ os:375, pecas:1275, kg:428.69, pcsDia:57.9, kgDia:19.5 },
+    "2025":{ os:410, pecas:1938, kg:528.30, pcsDia:88.1, kgDia:24.0 },
+  },
+  clientes: [
+    { nome:"Lábios de Mel", pecas:120, kg:32.02, os:31, pct:18.1 },
+    { nome:"Vape",          pecas:106, kg:38.50, os:30, pct:16.0 },
+    { nome:"FAV",           pecas: 89, kg:13.90, os: 7, pct:13.4 },
+    { nome:"Blumond",       pecas: 76, kg:33.95, os:16, pct:11.5 },
+    { nome:"Alepo",         pecas: 54, kg:14.55, os: 3, pct: 8.1 },
+  ],
+  lavagens: [
+    { nome:"Soft",         pecas:244, pct:36.8, os:72 },
+    { nome:"Reativo",      pecas:240, pct:36.2, os:59 },
+    { nome:"Soft c/ Sabão",pecas: 48, pct: 7.2, os: 2 },
+    { nome:"Alvejamento",  pecas: 42, pct: 6.3, os: 7 },
+    { nome:"Direto",       pecas: 33, pct: 5.0, os: 9 },
+  ],
+  maquinas: [
+    { id:"Máq 4", os:97, pecas:447, kg:136.25, pct:67.4, utilizacao:108.8 },
+    { id:"Máq 6", os:16, pecas: 94, kg: 35.46, pct:14.2, utilizacao: 36.0 },
+    { id:"Máq 5", os:39, pecas: 87, kg: 31.34, pct:13.1, utilizacao: 85.5 },
+    { id:"Máq 2", os:22, pecas: 22, kg:  8.42, pct: 3.3, utilizacao: 90.5 },
+    { id:"Máq 1", os:11, pecas: 11, kg:  3.47, pct: 1.7, utilizacao: 19.9 },
+    { id:"Máq 3 🔧", os:0, pecas:  0, kg:  0.00, pct: 0.0, utilizacao:  0.0 },
+  ],
+  kpis: {
+    utilizacaoMaq:45.8, ociosidade:54.2, cargaOS:3.55,
+    pesoMedioPeca:0.329, metaUtil:80, metaCarga:5, metaPeso:0.30,
+  },
+  manutencao: [
+    { maq:"Lavadora 3", desde:"26/05", dias:21, status:"🔴 Em manutenção", previsao:"sem previsão" },
+  ],
+  maioFechado: {
+    os:340, pecas:1830, kg:467.10,
+    pcsDia:87.14, kgDia:22.24, osDia:16.19, pesoMedio:0.255,
+    clientes: [
+      { nome:"Lábios de Mel", pecas:355, kg:76.05, os:52, pct:19.4 },
+      { nome:"July Kids",     pecas:331, kg:58.52, os:13, pct:18.1 },
+      { nome:"Convés",        pecas:189, kg:66.19, os:64, pct:10.3 },
+      { nome:"FAV",           pecas:187, kg:23.09, os:22, pct:10.2 },
+      { nome:"Z E N",         pecas:140, kg:24.95, os:27, pct: 7.7 },
+    ],
+    lavagens: [
+      { nome:"Reativo",      pecas:870, pct:47.5, os:139 },
+      { nome:"Soft",         pecas:497, pct:27.2, os:101 },
+      { nome:"Alvejamento",  pecas:177, pct: 9.7, os: 15 },
+      { nome:"Soft c/ Sabão",pecas: 94, pct: 5.1, os:  6 },
+      { nome:"Direto",       pecas: 91, pct: 5.0, os: 21 },
+    ],
+    maquinas: [
+      { id:"Máq 4", os:146, pecas:1077, kg:269.19, pct:58.9, utilizacao:197.3 },
+      { id:"Máq 6", os: 69, pecas: 537, kg:127.06, pct:29.3, utilizacao:149.4 },
+      { id:"Máq 5", os: 34, pecas:  88, kg: 29.10, pct: 4.8, utilizacao:102.2 },
+      { id:"Máq 2", os: 37, pecas:  45, kg: 14.28, pct: 2.5, utilizacao:134.2 },
+      { id:"Máq 1", os: 29, pecas:  45, kg: 12.16, pct: 2.5, utilizacao:106.4 },
+      { id:"Máq 3", os: 23, pecas:  35, kg: 13.83, pct: 1.9, utilizacao: 89.8 },
+    ],
+    kpis: {
+      utilizacaoMaq:45.8, ociosidade:54.2, cargaOS:5.38,
+      pesoMedioPeca:0.255, metaUtil:80, metaCarga:5, metaPeso:0.30,
+    },
+  },
+  programacaoHoje: {
+    data:"17/06 (qua) · 18/06 (qui)", os:19, pecas:57, kg:27.30,
+    resumoDias:[
+      { data:"17/06 (qua)", os:14, pecas:38, kg:19.22, util:"11%", status:"🟡 Folga" },
+      { data:"18/06 (qui)", os: 5, pecas:19, kg: 8.08, util:" 5%", status:"🟡 Folga" },
+    ],
+    clientes:[
+      { nome:"Blumond",       pecas:14, os:3, obs:"17+18/06" },
+      { nome:"Vizzo",         pecas:12, os:3, obs:"17/06" },
+      { nome:"Angela",        pecas:10, os:1, obs:"18/06" },
+      { nome:"Lábios de Mel", pecas: 7, os:1, obs:"17/06" },
+      { nome:"Vape",          pecas: 5, os:5, obs:"17+18/06" },
+      { nome:"Asimov",        pecas: 4, os:1, obs:"17/06" },
+      { nome:"Oshaya",        pecas: 2, os:2, obs:"17/06" },
+    ],
+    lavagens:[
+      { nome:"Reativo",        pecas:23, os:9 },
+      { nome:"Cationizado",    pecas:12, os:3 },
+      { nome:"Delave (C)",     pecas:10, os:1 },
+      { nome:"Soft",           pecas: 7, os:1 },
+      { nome:"Stoned",         pecas: 3, os:3 },
+      { nome:"Destroyer Médio",pecas: 1, os:1 },
+      { nome:"Direto",         pecas: 1, os:1 },
+    ],
+    alertaMaquina:"⚠ LAVADORA 3 em manutenção há 21 dias (desde 26/05) · Sem previsão de retorno",
+  },
+};
+
+
+const DS=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+const ANOS=["2023","2024","2025"];
+const CORA={"2023":"#B4B2A9","2024":"#88C4F0","2025":"#5A9FD4"};
+const nf=(v,d=1)=>typeof v==="number"&&!isNaN(v)?v.toFixed(d):"—";
+const fmt=v=>typeof v==="number"&&!isNaN(v)?v.toLocaleString("pt-BR"):"—";
+const pct=(a,b)=>b?((a-b)/b*100):0;
+
+function stPeca(p,ref,parc){
+  if(parc)return{l:"Hoje",c:"#185FA5",bg:"#E6F1FB"};
+  if(!ref||!p)return null;
+  const r=p/ref;
+  if(r>=1.05)return{l:"Acima",c:"#3B6D11",bg:"#EAF3DE"};
+  if(r>=0.85)return{l:"Na média",c:"#854F0B",bg:"#FAEEDA"};
+  return{l:"Abaixo",c:"#A32D2D",bg:"#FCEBEB"};
+}
+
+function Pill({l,bg,c}){return h("span",{style:{fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,background:bg,color:c,whiteSpace:"nowrap"}},l)}
+function Trend({v,r}){
+  if(!r||!v)return null;
+  const d=pct(v,r),up=d>0,neu=Math.abs(d)<2;
+  const col=neu?"#185FA5":up?"#3B6D11":"#A32D2D";
+  return h("span",{style:{fontSize:11,fontWeight:500,color:col}},(up&&!neu?"↑":(!up&&!neu?"↓":"−"))+" "+(d>0?"+":"")+d.toFixed(1)+"%")
+}
+function KCard({lbl,val,unit,sub,tv,tr,acc}){
+  return h("div",{style:{background:acc?"#185FA5":"var(--bg2)",borderRadius:10,padding:"14px 16px"}},
+    h("div",{style:{fontSize:11,color:acc?"rgba(255,255,255,.7)":"var(--txt3)",marginBottom:2,textTransform:"uppercase",letterSpacing:"0.06em"}},lbl),
+    h("div",{style:{fontSize:24,fontWeight:500,color:acc?"#fff":"var(--txt1)",lineHeight:1.1,marginBottom:4}},val,unit&&h("span",{style:{fontSize:13,fontWeight:400,color:acc?"rgba(255,255,255,.8)":"var(--txt2)",marginLeft:4}},unit)),
+    sub&&h("div",{style:{fontSize:12,color:acc?"rgba(255,255,255,.7)":"var(--txt3)"}},sub),
+    tv!==undefined&&h("div",{style:{marginTop:4}},h(Trend,{v:tv,r:tr}))
+  )
+}
+function Hr(){return h("hr",{style:{border:"none",borderTop:"0.5px solid var(--bdr1)",margin:"1.25rem 0"}})}
+function SLbl({children,action}){
+  return h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}},
+    h("div",{style:{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--txt3)"}},children),
+    action
+  )
+}
+
+function ChartDias({dias,mm,mh}){
+  if(!dias?.length)return h("div",{style:{textAlign:"center",padding:"2rem",color:"var(--txt3)",fontSize:13,border:"0.5px dashed var(--bdr1)",borderRadius:10}},"Detalhamento diário não disponível");
+  const W=560,H=200,PL=36,PB=32,PT=24,PR=12,iW=W-PL-PR,iH=H-PB-PT;
+  const mx=Math.max(...dias.map(d=>d.pecas),(mm||0)*1.4,(mh||0)*1.4,10);
+  const bW=Math.max(Math.floor(iW/dias.length)-6,10);
+  const ys=v=>PT+iH-(v/mx)*iH,xp=i=>PL+(i+.5)*(iW/dias.length);
+  return h("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",style:{overflow:"visible"}},
+    [0,Math.round(mx*.5),Math.round(mx)].map(v=>[
+      h("line",{key:"l"+v,x1:PL,x2:W-PR,y1:ys(v),y2:ys(v),stroke:"var(--bdr1)",strokeWidth:.5}),
+      h("text",{key:"t"+v,x:PL-5,y:ys(v)+4,textAnchor:"end",fontSize:9,fill:"var(--txt3)"},v)
+    ]),
+    mh>0&&[h("line",{key:"lh",x1:PL,x2:W-PR,y1:ys(mh),y2:ys(mh),stroke:"#639922",strokeWidth:1.5,strokeDasharray:"4,3"}),h("text",{key:"th",x:W-PR-2,y:ys(mh)-5,textAnchor:"end",fontSize:9,fill:"#639922"},"hist "+nf(mh,0))],
+    mm>0&&[h("line",{key:"lm",x1:PL,x2:W-PR,y1:ys(mm),y2:ys(mm),stroke:"#BA7517",strokeWidth:1.5,strokeDasharray:"5,3"}),h("text",{key:"tm",x:PL+4,y:ys(mm)-5,textAnchor:"start",fontSize:9,fill:"#BA7517"},"mês "+nf(mm,0))],
+    ...dias.map((d,i)=>{
+      const st=stPeca(d.pecas,mh,d.parcial);
+      const col=d.parcial?"rgba(24,95,165,.5)":st?.l==="Acima"?"#639922":st?.l==="Abaixo"?"#E24B4A":"#BA7517";
+      return[
+        h("rect",{key:"r"+i,x:xp(i)-bW/2,y:ys(d.pecas),width:bW,height:Math.max((d.pecas/mx)*iH,2),fill:col,rx:3}),
+        d.pecas>0&&h("text",{key:"v"+i,x:xp(i),y:ys(d.pecas)-4,textAnchor:"middle",fontSize:8.5,fontWeight:"500",fill:"var(--txt2)"},d.pecas),
+        h("text",{key:"d"+i,x:xp(i),y:H-4,textAnchor:"middle",fontSize:8,fill:"var(--txt3)"},(d.data||"").slice(0,5)),
+        h("text",{key:"s"+i,x:xp(i),y:H-14,textAnchor:"middle",fontSize:7.5,fill:"var(--txt3)"},d.ds),
+      ]
+    })
+  )
+}
+
+function TabMes({D}){
+  const{mesAtual:m,diasDoMes:dd,mediaAnual2026:ma,mediaHistoricaDia:mh}=D;
+  const proj=m?.pcsDia&&m?.diasRestantes?Math.round(m.pecas+m.pcsDia*m.diasRestantes):null;
+  const ritmo=ma?.pecasMes&&m?.diasRestantes?Math.round((ma.pecasMes-m.pecas)/m.diasRestantes):null;
+  const G=c=>({display:"grid",gridTemplateColumns:c,gap:10,marginBottom:12});
+  return h("div",null,
+    h(SLbl,null,"totais acumulados · "+m?.nome),
+    h("div",{style:G("repeat(auto-fit,minmax(130px,1fr))")},
+      h(KCard,{lbl:"Peças",val:fmt(m?.pecas),tv:m?.pcsDia,tr:ma?.pcsDia,acc:true}),
+      h(KCard,{lbl:"Peso (kg)",val:nf(m?.kg,1),tv:m?.kgDia,tr:ma?.kgDia}),
+      h(KCard,{lbl:"Ordens",val:fmt(m?.os),tv:m?.osDia,tr:ma?.osDia}),
+      h(KCard,{lbl:"Dias úteis",val:m?.diasUteis,sub:(m?.diasRestantes||0)+" restantes"})
+    ),
+    h("div",{style:{...G("repeat(auto-fit,minmax(130px,1fr))"),marginBottom:14}},
+      h(KCard,{lbl:"Pçs / dia",val:nf(m?.pcsDia),sub:"hist: "+nf(mh,0),tv:m?.pcsDia,tr:mh}),
+      h(KCard,{lbl:"KG / dia",val:nf(m?.kgDia,2),tv:m?.kgDia,tr:ma?.kgDia}),
+      h(KCard,{lbl:"O.S. / dia",val:nf(m?.osDia),tv:m?.osDia,tr:ma?.osDia}),
+      h(KCard,{lbl:"Kg / peça",val:nf(m?.pesoMedio,3)})
+    ),
+    (proj||ritmo)&&h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}},
+      proj&&h("div",{style:{background:"var(--bg2)",borderRadius:10,padding:"12px 14px"}},
+        h("div",{style:{fontSize:11,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}},"Projeção fim do mês"),
+        h("div",{style:{fontSize:22,fontWeight:500}},fmt(proj)+" ",h("span",{style:{fontSize:13,fontWeight:400,color:"var(--txt2)"}},"pçs")),
+        h("div",{style:{fontSize:12,color:"var(--txt3)",marginTop:2}},"no ritmo de "+nf(m?.pcsDia,0)+" pçs/dia")
+      ),
+      ritmo&&h("div",{style:{background:"var(--bg2)",borderRadius:10,padding:"12px 14px"}},
+        h("div",{style:{fontSize:11,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}},"Ritmo p/ bater média 2026"),
+        h("div",{style:{fontSize:22,fontWeight:500,color:ritmo>m?.pcsDia?"#A32D2D":"#3B6D11"}},fmt(ritmo)+" ",h("span",{style:{fontSize:13,fontWeight:400,color:"var(--txt2)"}},"pçs/dia")),
+        h("div",{style:{fontSize:12,color:"var(--txt3)",marginTop:2}},"nos "+m?.diasRestantes+" dias restantes")
+      )
+    ),
+    h(Hr),
+    h(SLbl,null,"produção dia a dia · "+m?.nome),
+    h(ChartDias,{dias:dd,mm:m?.pcsDia,mh}),
+    dd?.length>0&&h("div",{style:{display:"flex",gap:16,fontSize:11,color:"var(--txt2)",marginTop:6,marginBottom:14}},
+      h("span",{style:{display:"flex",alignItems:"center",gap:4}},h("span",{style:{width:14,height:2,background:"#BA7517",display:"inline-block",borderRadius:1}}),"Média mês"),
+      h("span",{style:{display:"flex",alignItems:"center",gap:4}},h("span",{style:{width:14,height:2,background:"#639922",display:"inline-block",borderRadius:1}}),"Ref. histórica")
+    ),
+    h(Hr),
+    h(SLbl,null,"mês atual vs médias"),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:6}},
+      [{l:"Pçs/dia vs média 2026",a:m?.pcsDia,r:ma?.pcsDia},{l:"Pçs/dia vs hist.",a:m?.pcsDia,r:mh},{l:"KG/dia vs média 2026",a:m?.kgDia,r:ma?.kgDia}].map((row,i)=>{
+        const v=row.r?pct(row.a,row.r):0,col=Math.abs(v)<2?"#185FA5":v>0?"#3B6D11":"#A32D2D";
+        return h("div",{key:i,style:{background:"var(--bg2)",borderRadius:8,padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+          h("span",{style:{fontSize:13,color:"var(--txt2)"}},row.l),
+          h("div",{style:{display:"flex",alignItems:"center",gap:10}},
+            h("span",{style:{fontSize:14,fontWeight:500}},nf(row.a)),
+            h("span",{style:{fontSize:12,color:"var(--txt3)"}},"vs "+nf(row.r)),
+            h("span",{style:{fontSize:11,fontWeight:500,color:col}},(v>0?"+":"")+v.toFixed(1)+"%")
+          )
+        )
+      })
+    )
+  )
+}
+
+function TabComp({D}){
+  const{mesAtual:m,historico:hi,mediaAnual2026:ma}=D;
+  const[met,sM]=useState("pecas");
+  const mets=[{k:"pecas",l:"Peças"},{k:"pcsDia",l:"Pçs/dia"},{k:"kgDia",l:"KG/dia"},{k:"os",l:"O.S."}];
+  const fv=(v,k)=>k==="pecas"||k==="os"?fmt(v):k==="kgDia"?nf(v,2):nf(v);
+  const mf=D.maioFechado;
+  const vA={pecas:mf?.pecas,pcsDia:mf?.pcsDia,kgDia:mf?.kgDia,os:mf?.os};
+  const anos=[...ANOS,"2026"];
+  const vs={"2023":hi?.["2023"]?.pecas||0,"2024":hi?.["2024"]?.pecas||0,"2025":hi?.["2025"]?.pecas||0,"2026":mf?.pecas||0};
+  const mx=Math.max(...Object.values(vs),ma?.pecasMes||0,1);
+  const W=520,H=140,PL=32,PB=26,PT=18,PR=8,iW=W-PL-PR,iH=H-PB-PT;
+  const bW=Math.floor(iW/anos.length)-18,ys=v=>PT+iH-(v/(mx*1.2))*iH,xp=i=>PL+(i+.5)*(iW/anos.length);
+  return h("div",null,
+    h("div",{style:{background:"#EAF3DE",borderRadius:8,padding:"9px 14px",marginBottom:14,fontSize:12,color:"#3B6D11",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+      h("span",null,"✓ ",h("b",null,"Junho/2026 · L3 ⚠ manutenção")," · 340 OS · 1.830 pçs · 467,10 kg · 87,14 pçs/dia"),
+      h("span",{style:{fontSize:11,color:"#639922"}},"21 dias úteis")
+    ),
+    h(SLbl,null,"Maio histórico · 2023 · 2024 · 2025 · 2026"),
+    h("div",{style:{display:"flex",gap:5,marginBottom:12,flexWrap:"wrap"}},
+      mets.map(t=>h("button",{key:t.k,onClick:()=>sM(t.k),style:{fontSize:12,padding:"4px 11px",borderRadius:20,border:"0.5px solid var(--bdr2)",background:met===t.k?"#185FA5":"transparent",color:met===t.k?"#fff":"var(--txt2)",cursor:"pointer"}},t.l))
+    ),
+    h("div",{style:{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}},
+      ...ANOS.map(a=>{const v=hi?.[a]?.[met],d=pct(vA[met],v);return h("div",{key:a,style:{background:"var(--bg2)",borderRadius:10,padding:"12px"}},h("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:4}},"Mai/"+a),h("div",{style:{fontSize:20,fontWeight:500}},fv(v,met)),h("div",{style:{fontSize:11,fontWeight:500,marginTop:4,color:Math.abs(d)<2?"#185FA5":d>0?"#3B6D11":"#A32D2D"}},(d>0?"+":"")+d.toFixed(1)+"% vs 26"));}),
+      h("div",{style:{background:"#185FA5",borderRadius:10,padding:"12px"}},h("div",{style:{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:4,fontWeight:500}},"Mai/26 ✓ fechado"),h("div",{style:{fontSize:20,fontWeight:500,color:"#fff"}},fv(vA[met],met)),h("div",{style:{fontSize:10,color:"rgba(255,255,255,.6)",marginTop:4}},"21 dias úteis"))
+    ),
+    h("svg",{viewBox:`0 0 ${W} ${H}`,width:"100%",style:{overflow:"visible"}},
+      [0,Math.round(mx*.5),Math.round(mx)].map(v=>[h("line",{key:"l"+v,x1:PL,x2:W-PR,y1:ys(v),y2:ys(v),stroke:"var(--bdr1)",strokeWidth:.5}),h("text",{key:"t"+v,x:PL-4,y:ys(v)+4,textAnchor:"end",fontSize:9,fill:"var(--txt3)"},v>=1000?(v/1e3).toFixed(1)+"k":v)]),
+      (ma?.pecasMes||0)>0&&[h("line",{key:"lm",x1:PL,x2:W-PR,y1:ys(ma.pecasMes),y2:ys(ma.pecasMes),stroke:"#BA7517",strokeWidth:1.2,strokeDasharray:"5,3"}),h("text",{key:"tm",x:PL+4,y:ys(ma.pecasMes)-5,fontSize:9,fill:"#BA7517"},"méd/mês: "+fmt(ma.pecasMes))],
+      ...anos.map((a,i)=>{const v=vs[a]||0,bh=Math.max((v/(mx*1.2))*iH,2),iA=a==="2026";return[h("rect",{key:"r"+a,x:xp(i)-bW/2,y:ys(v),width:bW,height:bh,fill:iA?"rgba(24,95,165,.7)":CORA[a],rx:3}),h("text",{key:"tv"+a,x:xp(i),y:ys(v)-5,textAnchor:"middle",fontSize:9,fill:"var(--txt2)",fontWeight:iA?"500":"400"},fmt(v)),h("text",{key:"ta"+a,x:xp(i),y:H-4,textAnchor:"middle",fontSize:10,fill:"var(--txt1)",fontWeight:iA?"500":"400"},a)]})
+    ),
+    h(Hr),
+    h(SLbl,null,"tabela completa · Maio por ano"),
+    h("div",{style:{overflowX:"auto"}},
+      h("table",{style:{width:"100%",borderCollapse:"collapse",fontSize:12}},
+        h("thead",null,h("tr",{style:{borderBottom:"0.5px solid var(--bdr1)"}},["","Mai/23","Mai/24","Mai/25","Méd 26/ano","Mai/26 ✓"].map(c=>h("th",{key:c,style:{padding:"5px 9px",textAlign:c===""?"left":"right",fontSize:11,fontWeight:500,color:"var(--txt3)"}},c)))),
+        h("tbody",null,[{l:"Peças",ak:"pecas",mak:"pecas",av:"pecasMes",f:fmt},{l:"Kg",ak:"kg",mak:"kg",av:null,f:v=>nf(v,2)},{l:"O.S.",ak:"os",mak:"os",av:null,f:fmt},{l:"Pçs/dia",ak:"pcsDia",mak:"pcsDia",av:"pcsDia",f:nf},{l:"KG/dia",ak:"kgDia",mak:"kgDia",av:"kgDia",f:v=>nf(v,2)}].map((row,ri)=>
+          h("tr",{key:ri,style:{borderBottom:"0.5px solid var(--bdr1)",background:ri%2?"var(--bg2)":"transparent"}},
+            h("td",{style:{padding:"6px 9px",color:"var(--txt2)",fontWeight:500}},row.l),
+            ...ANOS.map(a=>h("td",{key:a,style:{padding:"6px 9px",textAlign:"right"}},row.f(D.historico?.[a]?.[row.ak]))),
+            h("td",{style:{padding:"6px 9px",textAlign:"right",color:"var(--txt3)"}},row.av?row.f(D.mediaAnual2026?.[row.av]):"—"),
+            h("td",{style:{padding:"6px 9px",textAlign:"right",color:"#3B6D11",fontWeight:500}},row.f(D.maioFechado?.[row.mak]))
+          )
+        ))
+      )
+    ),
+    h(Hr),
+    h(SLbl,null,"acumulado 2026 · Janeiro → Maio"),
+    h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(90px,1fr))",gap:8}},
+      [{l:"Jan",pecas:2294,kg:593.39},{l:"Fev",pecas:1759,kg:479.94},{l:"Mar",pecas:1623,kg:746.89},{l:"Abr",pecas:1766,kg:511.36},{l:"Mai ✓",pecas:1830,kg:467.10}].map((mes,i)=>
+        h("div",{key:i,style:{background:i===4?"#EAF3DE":"var(--bg2)",borderRadius:8,padding:"10px 12px"}},
+          h("div",{style:{fontSize:11,color:i===4?"#3B6D11":"var(--txt3)",fontWeight:i===4?600:400,marginBottom:4}},mes.l),
+          h("div",{style:{fontSize:16,fontWeight:500,color:i===4?"#3B6D11":"var(--txt1)"}},fmt(mes.pecas)),
+          h("div",{style:{fontSize:11,color:"var(--txt3)"}},nf(mes.kg,0)+" kg")
+        )
+      )
+    )
+  )
+}
+
+function TabDetalhe({D}){
+  const[mes,sM]=useState("maio");
+  const fonte=mes==="maio"?D.maioFechado:D;
+  const{clientes,lavagens,maquinas,kpis:kp}=fonte;
+  const m=mes==="maio"?{nome:"Maio/2026",...D.maioFechado}:D.mesAtual;
+  const[ord,sO]=useState("pecas");
+  const[all,sA]=useState(false);
+  const srt=[...(clientes||[])].sort((a,b)=>(b[ord]||0)-(a[ord]||0));
+  const shown=all?srt:srt.slice(0,8);
+  const mc=Math.max(...srt.map(c=>c[ord]||0),1);
+  const ml=(lavagens?.[0]?.pecas)||1,mm=(maquinas?.[0]?.pecas)||1;
+  const kRows=[
+    {n:"Utilização das máquinas",v:nf(kp?.utilizacaoMaq)+"%",meta:kp?.metaUtil+"%",s:kp?.utilizacaoMaq>=kp?.metaUtil?"ok":kp?.utilizacaoMaq>=60?"wn":"cr"},
+    {n:"Ociosidade",v:nf(kp?.ociosidade)+"%",meta:"≤ 20%",s:kp?.ociosidade<=20?"ok":kp?.ociosidade<=40?"wn":"cr"},
+    {n:"Carga média / O.S.",v:nf(kp?.cargaOS,2)+" pçs",meta:kp?.metaCarga+" pçs",s:kp?.cargaOS>=kp?.metaCarga?"ok":"wn"},
+    {n:"Peso médio / peça",v:nf(kp?.pesoMedioPeca,3)+" kg",meta:kp?.metaPeso+" kg",s:kp?.pesoMedioPeca>=kp?.metaPeso?"ok":kp?.pesoMedioPeca>=0.22?"wn":"cr"},
+  ];
+  const ss={ok:["#EAF3DE","#3B6D11","Atingido"],wn:["#FAEEDA","#854F0B","Abaixo"],cr:["#FCEBEB","#A32D2D","Crítico"]};
+  return h("div",null,
+    h(SLbl,{action:h("div",{style:{display:"flex",gap:4}},[{k:"pecas",l:"Pçs"},{k:"kg",l:"KG"},{k:"os",l:"OS"}].map(t=>h("button",{key:t.k,onClick:()=>sO(t.k),style:{fontSize:11,padding:"2px 8px",borderRadius:20,border:"0.5px solid var(--bdr2)",background:ord===t.k?"#185FA5":"transparent",color:ord===t.k?"#fff":"var(--txt3)",cursor:"pointer"}},t.l)))},"clientes · "+m?.nome),
+    h("div",{style:{display:"flex",gap:6,marginBottom:12}},
+      h("button",{onClick:()=>sM("maio"),style:{fontSize:11,padding:"3px 10px",borderRadius:20,border:"0.5px solid var(--bdr2)",background:mes==="maio"?"#3B6D11":"transparent",color:mes==="maio"?"#fff":"var(--txt3)",cursor:"pointer"}},"✓ Junho/2026 · L3 ⚠ manutenção"),
+      h("button",{onClick:()=>sM("junho"),style:{fontSize:11,padding:"3px 10px",borderRadius:20,border:"0.5px solid var(--bdr2)",background:mes==="junho"?"#185FA5":"transparent",color:mes==="junho"?"#fff":"var(--txt3)",cursor:"pointer"}},"Junho/2026 atual")
+    ),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:6,marginBottom:8}},
+      shown.map((c,i)=>h("div",{key:c.nome,style:{background:"var(--bg2)",borderRadius:8,padding:"10px 14px"}},
+        h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:6}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8}},h("span",{style:{fontSize:13,color:"var(--txt3)",minWidth:16}},i+1),h("span",{style:{fontSize:13,fontWeight:500}},c.nome)),
+          h("div",{style:{display:"flex",alignItems:"center",gap:12,fontSize:12,color:"var(--txt2)"}},
+            h("span",null,h("b",{style:{color:"var(--txt1)"}},fmt(c.pecas))," pçs"),
+            h("span",null,h("b",{style:{color:"var(--txt1)"}},nf(c.kg,1))," kg"),
+            h("span",null,h("b",{style:{color:"var(--txt1)"}},c.os)," OS"),
+            h("span",{style:{color:"var(--txt3)"}},nf(c.pct,1)+"%")
+          )
+        ),
+        h("div",{style:{height:6,background:"var(--bdr1)",borderRadius:3,overflow:"hidden"}},h("div",{style:{width:(c[ord]/mc*100)+"%",height:"100%",background:"#185FA5",borderRadius:3,transition:"width .5s"}}))
+      ))
+    ),
+    srt.length>8&&h("button",{onClick:()=>sA(!all),style:{fontSize:12,padding:"5px 12px",borderRadius:6,border:"0.5px solid var(--bdr2)",background:"transparent",color:"var(--txt2)",cursor:"pointer",marginBottom:8}},all?"Mostrar menos":"Ver todos ("+srt.length+")"),
+    h(Hr),
+    h(SLbl,null,"lavagens · "+m?.nome),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:5,marginBottom:"1rem"}},
+      (lavagens||[]).map((l,i)=>h("div",{key:l.nome,style:{display:"flex",alignItems:"center",gap:10}},
+        h("span",{style:{fontSize:11,color:"var(--txt3)",minWidth:16,textAlign:"right"}},i+1),
+        h("span",{style:{fontSize:13,minWidth:140,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},l.nome),
+        h("div",{style:{flex:1,height:20,background:"var(--bdr1)",borderRadius:4,overflow:"hidden"}},h("div",{style:{width:(l.pecas/ml*100)+"%",height:"100%",background:"#1D9E75",borderRadius:4,transition:"width .5s"}})),
+        h("span",{style:{fontSize:13,fontWeight:500,minWidth:40,textAlign:"right"}},fmt(l.pecas)),
+        h("span",{style:{fontSize:11,color:"var(--txt3)",minWidth:36,textAlign:"right"}},nf(l.pct,1)+"%")
+      ))
+    ),
+    h(Hr),
+    h(SLbl,null,"máquinas · "+m?.nome),
+    h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}},
+      (maquinas||[]).map((q,i)=>{
+        const uc=q.utilizacao>100?"#A32D2D":q.utilizacao>70?"#3B6D11":"#854F0B";
+        return h("div",{key:q.id,style:{background:"var(--bg2)",borderRadius:8,padding:"10px 12px"}},
+          h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:6}},h("span",{style:{fontSize:13,fontWeight:500}},q.id),h("span",{style:{fontSize:11,color:"var(--txt3)"}},nf(q.pct,1)+"%")),
+          h("div",{style:{fontSize:12,color:"var(--txt2)",marginBottom:6}},h("b",{style:{color:"var(--txt1)"}},fmt(q.pecas))," pçs · ",h("b",{style:{color:"var(--txt1)"}},nf(q.kg,1))," kg"),
+          h("div",{style:{height:5,background:"var(--bdr1)",borderRadius:3,overflow:"hidden"}},h("div",{style:{width:Math.min(q.pecas/mm*100,100)+"%",height:"100%",background:i<2?"#185FA5":"#B4B2A9",borderRadius:3}})),
+          q.utilizacao>0&&h("div",{style:{fontSize:11,color:uc,marginTop:5,fontWeight:500}},"Util: "+nf(q.utilizacao,0)+"%")
+        )
+      })
+    ),
+    h(Hr),
+    h(SLbl,null,"eficiência operacional"),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+      kRows.map((r,i)=>{const ST=ss[r.s];return h("div",{key:i,style:{background:"var(--bg2)",borderRadius:8,padding:"11px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}},
+        h("div",null,h("div",{style:{fontSize:12,color:"var(--txt2)"}},r.n),h("div",{style:{fontSize:18,fontWeight:500}},r.v)),
+        h("div",{style:{textAlign:"right"}},h("div",{style:{fontSize:11,color:"var(--txt3)",marginBottom:4}},"Meta: "+r.meta),h(Pill,{l:ST[2],bg:ST[0],c:ST[1]}))
+      )})
+    )
+  )
+}
+
+function TabProg({D}){
+  const p=D.programacaoHoje;
+  if(!p)return h("div",{style:{color:"var(--txt3)",fontSize:13,padding:"2rem",textAlign:"center"}},"Sem dados");
+  const maxC=Math.max(...p.clientes.map(c=>c.pecas),1);
+  const maxL=Math.max(...p.lavagens.map(l=>l.pecas),1);
+  return h("div",null,
+    h(SLbl,null,"programação em aberto · "+p.data),
+    h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:10,marginBottom:14}},
+      h(KCard,{lbl:"OS pendentes",val:p.os,acc:true}),
+      h(KCard,{lbl:"Peças",val:fmt(p.pecas)}),
+      h(KCard,{lbl:"Peso (kg)",val:nf(p.kg,2)}),
+      h(KCard,{lbl:"Capacidade",val:"74%",sub:"97h30 · OK"})
+    ),
+    p.resumoDias&&h("div",{style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:10,marginBottom:14}},
+      p.resumoDias.map((d,i)=>h("div",{key:i,style:{background:"var(--bg2)",borderRadius:10,padding:"12px 14px"}},
+        h("div",{style:{fontSize:12,fontWeight:500,marginBottom:6}},d.data),
+        h("div",{style:{display:"flex",gap:16,fontSize:12,color:"var(--txt2)",marginBottom:6}},h("span",null,h("b",null,d.os)," OS"),h("span",null,h("b",null,d.pecas)," pçs"),h("span",null,h("b",null,nf(d.kg,2))," kg")),
+        h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--txt3)"}},h("span",null,"Util: ",h("b",{style:{color:"var(--txt2)"}},d.util)),h("span",null,d.status))
+      ))
+    ),
+    h("div",{style:{background:"#FAEEDA",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:13,color:"#854F0B"}},"⚠ Ordens programadas sem BAIXA — aguardando processamento"),
+    h(Hr),
+    h(SLbl,null,"clientes programados"),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:6,marginBottom:14}},
+      p.clientes.map((c,i)=>h("div",{key:c.nome,style:{background:"var(--bg2)",borderRadius:8,padding:"10px 14px"}},
+        h("div",{style:{display:"flex",justifyContent:"space-between",marginBottom:6}},
+          h("div",{style:{display:"flex",alignItems:"center",gap:8}},h("span",{style:{fontSize:13,color:"var(--txt3)",minWidth:16}},i+1),h("span",{style:{fontSize:13,fontWeight:500}},c.nome),c.obs&&h("span",{style:{fontSize:10,color:"var(--txt3)",background:"var(--bdr1)",padding:"1px 6px",borderRadius:10}},c.obs)),
+          h("div",{style:{display:"flex",gap:12,fontSize:12,color:"var(--txt2)"}},h("span",null,h("b",{style:{color:"var(--txt1)"}},c.pecas)," pçs"),h("span",null,h("b",{style:{color:"var(--txt1)"}},c.os)," OS"),h("span",{style:{color:"var(--txt3)"}},(c.pecas/p.pecas*100).toFixed(1)+"%"))
+        ),
+        h("div",{style:{height:6,background:"var(--bdr1)",borderRadius:3,overflow:"hidden"}},h("div",{style:{width:(c.pecas/maxC*100)+"%",height:"100%",background:"#185FA5",borderRadius:3}}))
+      ))
+    ),
+    h(Hr),
+    h(SLbl,null,"lavagens programadas"),
+    h("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+      p.lavagens.map((l,i)=>h("div",{key:l.nome,style:{display:"flex",alignItems:"center",gap:10}},
+        h("span",{style:{fontSize:11,color:"var(--txt3)",minWidth:16,textAlign:"right"}},i+1),
+        h("span",{style:{fontSize:13,minWidth:120}},l.nome),
+        h("div",{style:{flex:1,height:20,background:"var(--bdr1)",borderRadius:4,overflow:"hidden"}},h("div",{style:{width:(l.pecas/maxL*100)+"%",height:"100%",background:"#1D9E75",borderRadius:4}})),
+        h("span",{style:{fontSize:13,fontWeight:500,minWidth:36,textAlign:"right"}},l.pecas),
+        h("span",{style:{fontSize:11,color:"var(--txt3)",minWidth:32,textAlign:"right"}},l.os+" OS"),
+        h("span",{style:{fontSize:11,color:"var(--txt3)",minWidth:40,textAlign:"right"}},(l.pecas/p.pecas*100).toFixed(1)+"%")
+      ))
+    )
+  )
+}
+
+function TabIA({D}){
+  const[st,sSt]=useState("idle");
+  const[an,sAn]=useState(null);
+  const[er,sEr]=useState(null);
+  const[raw,sRaw]=useState(null);
+  const m=D.mesAtual,ma=D.mediaAnual2026,mh=D.mediaHistoricaDia,hi=D.historico,mf=D.maioFechado;
+
+  function exJSON(txt){
+    const m1=txt.match(/```json\s*([\s\S]*?)```/);if(m1){try{return JSON.parse(m1[1].trim());}catch{}}
+    const m2=txt.match(/```\s*([\s\S]*?)```/);if(m2){try{return JSON.parse(m2[1].trim());}catch{}}
+    const s=txt.indexOf("{");if(s>=0){let d=0,e=-1;for(let i=s;i<txt.length;i++){if(txt[i]==="{")d++;else if(txt[i]==="}"){d--;if(!d){e=i;break;}}}if(e>s){try{return JSON.parse(txt.slice(s,e+1));}catch{}}}
+    return null;
+  }
+
+  async function gerar(){
+    sSt("loading");sEr(null);sAn(null);sRaw(null);
+    const ref=mf||m;
+    const prompt=[
+      "Você é especialista em operações de tinturaria.",
+      "Analise Maio/2026 da Delta Tinturaria. Responda SOMENTE com JSON válido.",
+      "DADOS:",
+      "Peças:"+ref.pecas+" | OS:"+ref.os+" | KG:"+ref.kg,
+      "Pcs/dia:"+ref.pcsDia+" | KG/dia:"+ref.kgDia+" | Dias:"+21,
+      "Util maq:"+D.kpis.utilizacaoMaq+"% (meta 80%) | Ociosidade:"+D.kpis.ociosidade+"% (meta max 20%)",
+      "Carga/OS:"+D.kpis.cargaOS+" pcs (meta 5) | Peso/peca:"+D.kpis.pesoMedioPeca+"kg (meta 0.30)",
+      "Historico Mai: 2023="+hi["2023"].pecas+"pcs, 2024="+hi["2024"].pecas+"pcs, 2025="+hi["2025"].pecas+"pcs",
+      "Media hist:"+mh+" pcs/dia | Media anual 2026:"+ma.pcsDia+" pcs/dia",
+      "Clientes:"+(D.maioFechado?.clientes||[]).map(c=>c.nome+"("+c.pecas+"pcs)").join(", "),
+      "Lavagens:"+(D.maioFechado?.lavagens||[]).map(l=>l.nome+"("+l.pecas+"pcs)").join(", "),
+      "Maquinas:"+(D.maioFechado?.maquinas||[]).map(q=>q.id+":"+q.pecas+"pcs util"+q.utilizacao+"%").join(", "),
+      "Formato: {\"nota\":7,\"resumo\":\"frase\",\"pontos_positivos\":[\"a\",\"b\",\"c\"],\"pontos_atencao\":[\"a\",\"b\",\"c\"],\"alertas\":[{\"nivel\":\"critico\",\"titulo\":\"t\",\"descricao\":\"d\"}],\"recomendacoes\":[{\"prioridade\":\"alta\",\"acao\":\"a\",\"impacto\":\"i\"}],\"previsao_junho\":{\"cenario\":\"moderado\",\"pecas_estimadas\":1900,\"justificativa\":\"j\"}}"
+    ].join("\n");
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1500,messages:[{role:"user",content:prompt}]})});
+      if(!r.ok){const t=await r.text();throw new Error("HTTP "+r.status+": "+t.slice(0,200));}
+      const j=await r.json();
+      const txt=(j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+      sRaw(txt.slice(0,600));
+      const p=exJSON(txt);
+      if(!p)throw new Error("JSON não encontrado. Resposta: "+txt.slice(0,150));
+      sAn(p);sSt("done");
+    }catch(e){sEr(e.message);sSt("error");}
+  }
+
+  const nCor=n=>n>=8?"#3B6D11":n>=6?"#854F0B":"#A32D2D";
+  const nBg=n=>n>=8?"#EAF3DE":n>=6?"#FAEEDA":"#FCEBEB";
+  const pCor={alta:"#A32D2D",media:"#854F0B",baixa:"#3B6D11"};
+  const pBg={alta:"#FCEBEB",media:"#FAEEDA",baixa:"#EAF3DE"};
+  const nCN={critico:"#A32D2D",atencao:"#854F0B",ok:"#3B6D11"};
+  const nBN={critico:"#FCEBEB",atencao:"#FAEEDA",ok:"#EAF3DE"};
+  const nIC={critico:"🔴",atencao:"🟡",ok:"🟢"};
+
+  return h("div",null,
+    h(SLbl,null,"avaliação inteligente · Junho/2026 · L3 ⚠ manutenção"),
+    st==="idle"&&h("div",{style:{background:"var(--bg2)",borderRadius:12,padding:"2rem",textAlign:"center",marginBottom:16}},
+      h("div",{style:{fontSize:32,marginBottom:12}},"🤖"),
+      h("div",{style:{fontSize:15,fontWeight:500,marginBottom:8}},"Análise IA — Maio/2026"),
+      h("div",{style:{fontSize:13,color:"var(--txt3)",marginBottom:20,lineHeight:1.6}},"O Claude analisa KPIs, histórico, clientes e máquinas e gera diagnóstico com alertas e recomendações."),
+      h("button",{onClick:gerar,style:{padding:"10px 24px",background:"#185FA5",color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:500,cursor:"pointer"}},"✦ Gerar Avaliação IA")
+    ),
+    st==="loading"&&h("div",{style:{background:"var(--bg2)",borderRadius:12,padding:"2rem",textAlign:"center"}},
+      h("div",{style:{fontSize:13,color:"var(--txt2)",display:"flex",alignItems:"center",justifyContent:"center",gap:10}},
+        h("span",{style:{display:"inline-block",animation:"spin .8s linear infinite",fontSize:18}},"⟳"),
+        "Analisando dados de Maio/2026…"
+      )
+    ),
+    st==="error"&&h("div",null,
+      h("div",{style:{background:"#FCEBEB",color:"#A32D2D",borderRadius:8,padding:"12px 16px",marginBottom:10,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}},
+        h("span",{style:{flex:1,lineHeight:1.5}},"⚠ "+er),
+        h("button",{onClick:gerar,style:{fontSize:12,padding:"4px 10px",borderRadius:6,border:"1px solid #A32D2D",background:"transparent",color:"#A32D2D",cursor:"pointer",whiteSpace:"nowrap"}},"Tentar novamente")
+      ),
+      raw&&h("details",{style:{marginTop:8}},h("summary",{style:{fontSize:11,color:"var(--txt3)",cursor:"pointer"}},"Ver resposta bruta"),h("pre",{style:{fontSize:10,background:"var(--bg2)",borderRadius:6,padding:10,overflowX:"auto",maxHeight:200,marginTop:6,whiteSpace:"pre-wrap",color:"var(--txt2)"}},raw))
+    ),
+    st==="done"&&an&&h("div",null,
+      h("div",{style:{display:"grid",gridTemplateColumns:"auto 1fr",gap:16,background:"var(--bg2)",borderRadius:12,padding:"18px 20px",marginBottom:14,alignItems:"center"}},
+        h("div",{style:{textAlign:"center"}},
+          h("div",{style:{width:72,height:72,borderRadius:"50%",background:nBg(an.nota),display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column"}},
+            h("span",{style:{fontSize:26,fontWeight:700,color:nCor(an.nota),lineHeight:1}},an.nota),
+            h("span",{style:{fontSize:10,color:nCor(an.nota)}},"/10")
+          ),
+          h("div",{style:{fontSize:10,color:"var(--txt3)",marginTop:4}},"Performance")
+        ),
+        h("div",null,
+          h("div",{style:{fontSize:11,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:6}},"Resumo executivo"),
+          h("div",{style:{fontSize:13,color:"var(--txt2)",lineHeight:1.6}},an.resumo)
+        )
+      ),
+      an.alertas?.length>0&&h("div",{style:{display:"flex",flexDirection:"column",gap:8,marginBottom:14}},
+        h("div",{style:{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--txt3)",marginBottom:2}},"Alertas operacionais"),
+        ...an.alertas.map((a,i)=>h("div",{key:i,style:{background:nBN[a.nivel]||"var(--bg2)",borderRadius:8,padding:"10px 14px",display:"flex",gap:10,alignItems:"flex-start"}},
+          h("span",{style:{fontSize:14,marginTop:1}},nIC[a.nivel]||"⚪"),
+          h("div",null,h("div",{style:{fontSize:13,fontWeight:500,color:nCN[a.nivel]||"var(--txt1)"}},a.titulo),h("div",{style:{fontSize:12,color:"var(--txt2)",marginTop:2}},a.descricao))
+        ))
+      ),
+      h(Hr),
+      h("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}},
+        h("div",null,
+          h("div",{style:{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:"#3B6D11",marginBottom:8}},"✓ Pontos positivos"),
+          h("div",{style:{display:"flex",flexDirection:"column",gap:6}},...(an.pontos_positivos||[]).map((p,i)=>h("div",{key:i,style:{background:"#EAF3DE",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#3B6D11",lineHeight:1.5}},p)))
+        ),
+        h("div",null,
+          h("div",{style:{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:"#854F0B",marginBottom:8}},"⚠ Pontos de atenção"),
+          h("div",{style:{display:"flex",flexDirection:"column",gap:6}},...(an.pontos_atencao||[]).map((p,i)=>h("div",{key:i,style:{background:"#FAEEDA",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#854F0B",lineHeight:1.5}},p)))
+        )
+      ),
+      h(Hr),
+      an.recomendacoes?.length>0&&h("div",{style:{marginBottom:14}},
+        h("div",{style:{fontSize:11,fontWeight:500,textTransform:"uppercase",letterSpacing:"0.08em",color:"var(--txt3)",marginBottom:10}},"Recomendações"),
+        h("div",{style:{display:"flex",flexDirection:"column",gap:8}},
+          ...an.recomendacoes.map((r,i)=>h("div",{key:i,style:{background:"var(--bg2)",borderRadius:8,padding:"12px 14px",display:"flex",gap:12,alignItems:"flex-start"}},
+            h("span",{style:{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:20,background:pBg[r.prioridade],color:pCor[r.prioridade],whiteSpace:"nowrap",marginTop:1}},(r.prioridade||"").toUpperCase()),
+            h("div",null,h("div",{style:{fontSize:13,fontWeight:500,color:"var(--txt1)",marginBottom:3}},r.acao),h("div",{style:{fontSize:12,color:"var(--txt3)"}},r.impacto))
+          ))
+        )
+      ),
+      h(Hr),
+      an.previsao_junho&&h("div",{style:{background:"var(--bg2)",borderRadius:10,padding:"14px 16px",marginBottom:14}},
+        h("div",{style:{fontSize:11,color:"var(--txt3)",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8}},"Previsão Junho/2026 · cenário "+(an.previsao_junho.cenario||"")),
+        h("div",{style:{display:"flex",alignItems:"baseline",gap:8,marginBottom:6}},
+          h("span",{style:{fontSize:28,fontWeight:500,color:"var(--txt1)"}},(an.previsao_junho.pecas_estimadas||0).toLocaleString("pt-BR")),
+          h("span",{style:{fontSize:13,color:"var(--txt2)"}},"peças estimadas")
+        ),
+        h("div",{style:{fontSize:12,color:"var(--txt3)",lineHeight:1.5}},an.previsao_junho.justificativa)
+      ),
+      h("div",{style:{textAlign:"center",marginTop:8}},h("button",{onClick:gerar,style:{fontSize:12,padding:"6px 16px",borderRadius:6,border:"0.5px solid var(--bdr2)",background:"transparent",color:"var(--txt2)",cursor:"pointer"}},"↺ Reanalisar"))
+    )
+  )
+}
+
+function App(){
+  const[tab,sT]=useState("mes");
+  const D=BASE;
+  const TABS=[{k:"mes",l:"Mês atual"},{k:"comp",l:"Comparativo"},{k:"det",l:"Detalhamento"},{k:"prog",l:"Programação"},{k:"ia",l:"✦ Avaliação IA"}];
+  return h("div",{style:{paddingBottom:40}},
+    h("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"1.2rem",flexWrap:"wrap",gap:10}},
+      h("div",null,
+        h("div",{style:{fontSize:20,fontWeight:500,letterSpacing:"-0.3px",color:"var(--txt1)"}},"Painel PCA · "+D.mesAtual.nome),
+        h("div",{style:{fontSize:12,color:"var(--txt3)",marginTop:2}},"PCA.2026.xlsx · Delta Tinturaria · Junho/2026 · L3 ⚠ manutenção")
+      ),
+      h("div",{style:{background:"#EAF3DE",borderRadius:8,padding:"6px 14px",fontSize:12,color:"#3B6D11",fontWeight:500}},"✓ Atualizado 16/06/2026 · 17:02")
+    ),
+    h("div",{style:{display:"flex",borderBottom:"0.5px solid var(--bdr1)",marginBottom:"1.2rem",overflowX:"auto"}},
+      TABS.map(t=>h("button",{key:t.k,onClick:()=>sT(t.k),style:{padding:"8px 14px",fontSize:13,border:"none",borderBottom:tab===t.k?"2px solid #185FA5":"2px solid transparent",background:"transparent",color:tab===t.k?"#185FA5":"var(--txt3)",cursor:"pointer",fontWeight:tab===t.k?500:400,marginBottom:-0.5,whiteSpace:"nowrap"}},t.l))
+    ),
+    tab==="mes"&&h(TabMes,{D}),
+    tab==="comp"&&h(TabComp,{D}),
+    tab==="det"&&h(TabDetalhe,{D}),
+    tab==="prog"&&h(TabProg,{D}),
+    tab==="ia"&&h(TabIA,{D})
+  )
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(h(App));
+</script>
+</body>
+</html>
